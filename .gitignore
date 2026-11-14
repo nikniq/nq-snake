@@ -3,6 +3,7 @@
 .env
 .env.backup
 .env.production
+.env.before-restore-*
 .phpactor.json
 .phpunit.result.cache
 /.codex
@@ -20,6 +21,7 @@
 /public_html/storage
 /storage/*.key
 /storage/pail
+/storage/backups/
 /storage/framework/database-init.lock
 /database/*.sqlite
 /database/*.sqlite-journal

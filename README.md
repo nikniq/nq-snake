@@ -103,6 +103,82 @@ php artisan test
 
 The suite covers the game page, the custom public path, leaderboard ordering, validation, and score persistence.
 
+## Operations & maintenance
+
+Two executable helpers live in the project root.
+
+### `./deploy.sh`
+
+One-command deployment: pulls the branch, installs Composer/npm dependencies,
+builds assets, runs migrations, fixes permissions, rebuilds caches, and performs
+a health check. It enables maintenance mode for the duration of the deploy and
+always tries to bring the site back up, including when a step fails.
+
+```bash
+cd /home/customer/www/snake.nikniq.com
+./deploy.sh
+```
+
+Useful options:
+
+```bash
+./deploy.sh --no-pull          # deploy the current checkout
+./deploy.sh --no-build         # skip npm (e.g. Node is not installed on the host)
+./deploy.sh --no-migrate       # skip migrations
+./deploy.sh --no-maintenance   # zero-downtime attempt (not recommended for deps)
+./deploy.sh --dry-run          # print every step without changing anything
+PHP_BIN=php8.5 ./deploy.sh     # choose the PHP CLI binary
+```
+
+Deployment logs are written to `storage/logs/deploy-*.log`.
+
+If Node.js is unavailable on the host, build locally with `npm run build`, upload
+`public_html/build/`, and deploy with `--no-build`.
+
+### `./cx.sh`
+
+Operations and maintenance console:
+
+| Command | Purpose |
+| ------- | ------- |
+| `./cx.sh` / `status` | App, DB, storage, maintenance and git overview |
+| `./cx.sh health [url]` | Check `/up` and the homepage (defaults to `APP_URL`) |
+| `./cx.sh logs [lines]` | Tail `storage/logs/laravel.log` |
+| `./cx.sh backup` | Archive `.env` + SQLite DB to `storage/backups` (keeps 10) |
+| `./cx.sh restore <archive> [--yes]` | Restore a backup (creates a safety backup first) |
+| `./cx.sh db` / `scores [n]` | Table row counts / leaderboard |
+| `./cx.sh clear` / `optimize` | Clear or rebuild all Laravel caches |
+| `./cx.sh migrate` / `test` | Run migrations / the test suite |
+| `./cx.sh permissions` | Fix storage, cache, DB and build permissions |
+| `./cx.sh schedule` | Run the scheduler once (for cron) |
+| `./cx.sh down` / `up` | Toggle maintenance mode |
+| `./cx.sh artisan <args>` | Any Artisan command passthrough |
+| `./cx.sh deploy [opts]` | Delegate to `deploy.sh` |
+
+Examples:
+
+```bash
+./cx.sh status
+./cx.sh health https://snake.nikniq.com
+./cx.sh scores 10
+BACKUP_KEEP=14 ./cx.sh backup
+./cx.sh restore storage/backups/neon-snake-20261114-123724.tar.gz --yes
+CX_YES=1 ./cx.sh down
+```
+
+Cron examples:
+
+```cron
+# Scheduler
+* * * * * cd /home/customer/www/snake.nikniq.com && ./cx.sh schedule >> storage/logs/cron.log 2>&1
+
+# Nightly backup, retaining 14 archives
+15 3 * * * cd /home/customer/www/snake.nikniq.com && BACKUP_KEEP=14 ./cx.sh backup >> storage/logs/backup.log 2>&1
+```
+
+Set `PHP_BIN=php8.5` if the CLI `php` differs from the PHP version used by the
+website.
+
 ## Production notes
 
 - Run `npm run build` (or `npm ci && npm run build`) during deployment.
