@@ -30,6 +30,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Automatic Database Setup
+    |--------------------------------------------------------------------------
+    |
+    | When using SQLite, the app creates a missing database file and runs the
+    | migrations on the first web request. Disable this if your deployment
+    | pipeline runs "php artisan migrate --force" itself.
+    |
+    */
+
+    'auto_migrate' => env('DB_AUTO_MIGRATE', true),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Debug Mode
     |--------------------------------------------------------------------------
     |

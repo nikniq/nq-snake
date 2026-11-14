@@ -109,3 +109,29 @@ The suite covers the game page, the custom public path, leaderboard ordering, va
 - `php artisan config:cache`, `route:cache`, and `view:cache` are safe to use.
 - `public_html/build/` and `public_html/hot` are ignored by git; deploy the built assets.
 - The leaderboard uses the default SQLite connection. Point `DB_CONNECTION` at MySQL/Postgres in `.env` for production and run `php artisan migrate --force`.
+- Set `APP_DEBUG=false` in production.
+
+### Shared hosting / missing SQLite file
+
+SQLite databases are gitignored, so a fresh deployment may not have
+`database/database.sqlite`. The `AppServiceProvider` creates the file and runs
+the migrations automatically on the first web request (guarded by a file lock
+to avoid racing requests). This means a Git deployment starts working without
+shell access.
+
+The first request after deploying may take a moment while migrations run. On
+subsequent requests only a lightweight `migrations` table check is performed.
+Set `DB_AUTO_MIGRATE=false` if your deployment pipeline already runs
+`php artisan migrate --force`.
+
+To initialise the database ahead of time instead, run:
+
+```bash
+touch database/database.sqlite
+php artisan migrate --force
+```
+
+If the app still reports that the database file does not exist, make sure the
+`database/` directory is writable by PHP. If you prefer not to use SQLite, set
+`DB_CONNECTION` and its credentials in `.env`, create the database, and run
+`php artisan migrate --force`.
