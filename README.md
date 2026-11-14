@@ -109,10 +109,11 @@ Two executable helpers live in the project root.
 
 ### `./deploy.sh`
 
-One-command deployment: pulls the branch, installs Composer/npm dependencies,
-builds assets, runs migrations, fixes permissions, rebuilds caches, and performs
-a health check. It enables maintenance mode for the duration of the deploy and
-always tries to bring the site back up, including when a step fails.
+One-command deployment: pulls the branch, installs Composer dependencies, uses
+the committed frontend assets (or builds them with `--build`), runs migrations,
+fixes permissions, rebuilds caches, and performs a health check. It enables
+maintenance mode for the duration of the deploy and always tries to bring the
+site back up, including when a step fails.
 
 ```bash
 cd /home/customer/www/snake.nikniq.com
@@ -123,7 +124,8 @@ Useful options:
 
 ```bash
 ./deploy.sh --no-pull          # deploy the current checkout
-./deploy.sh --no-build         # skip npm (e.g. Node is not installed on the host)
+./deploy.sh --build            # rebuild assets on a host with Node.js
+./deploy.sh --no-build         # use committed assets (default)
 ./deploy.sh --no-migrate       # skip migrations
 ./deploy.sh --no-maintenance   # zero-downtime attempt (not recommended for deps)
 ./deploy.sh --dry-run          # print every step without changing anything
@@ -132,8 +134,10 @@ PHP_BIN=php8.5 ./deploy.sh     # choose the PHP CLI binary
 
 Deployment logs are written to `storage/logs/deploy-*.log`.
 
-If Node.js is unavailable on the host, build locally with `npm run build`, upload
-`public_html/build/`, and deploy with `--no-build`.
+Frontend assets are committed under `public_html/build/`, so Node.js is not
+required on the server. After changing `resources/css` or `resources/js`, run
+`npm run build` locally and commit the updated build. Use `./deploy.sh --build`
+to compile on the server instead.
 
 ### `./cx.sh`
 
@@ -181,9 +185,10 @@ website.
 
 ## Production notes
 
-- Run `npm run build` (or `npm ci && npm run build`) during deployment.
+- Frontend assets are committed under `public_html/build/`. After frontend
+  changes, run `npm run build` and commit the result (or deploy with `--build`).
 - `php artisan config:cache`, `route:cache`, and `view:cache` are safe to use.
-- `public_html/build/` and `public_html/hot` are ignored by git; deploy the built assets.
+- `public_html/hot` is ignored by git; it only exists while `npm run dev` is running.
 - The leaderboard uses the default SQLite connection. Point `DB_CONNECTION` at MySQL/Postgres in `.env` for production and run `php artisan migrate --force`.
 - Set `APP_DEBUG=false` in production.
 

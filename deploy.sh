@@ -15,7 +15,7 @@ cd "$ROOT"
 BRANCH="${DEPLOY_BRANCH:-main}"
 DO_PULL=1
 DO_COMPOSER=1
-DO_BUILD=1
+DO_BUILD=0
 DO_MIGRATE=1
 DO_OPTIMIZE=1
 USE_MAINTENANCE=1
@@ -33,7 +33,8 @@ Usage: ./deploy.sh [options]
 Options:
   --no-pull          Skip git fetch/pull (deploy the current checkout)
   --no-composer      Skip composer install
-  --no-build         Skip npm ci / npm run build
+  --build            Build frontend assets with npm (requires Node.js)
+  --no-build         Use the committed public_html/build assets (default)
   --no-migrate       Skip database migrations
   --no-optimize      Skip clearing/rebuilding Laravel caches
   --no-maintenance   Do not enable maintenance mode during the deploy
@@ -54,6 +55,7 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --no-pull) DO_PULL=0 ;;
         --no-composer) DO_COMPOSER=0 ;;
+        --build) DO_BUILD=1 ;;
         --no-build) DO_BUILD=0 ;;
         --no-migrate) DO_MIGRATE=0 ;;
         --no-optimize) DO_OPTIMIZE=0 ;;
@@ -270,11 +272,11 @@ if [ "$DO_COMPOSER" -eq 1 ] && [ "${#COMPOSER_CMD[@]}" -eq 0 ]; then
 fi
 
 if [ "$DO_BUILD" -eq 1 ] && ! command -v "$NPM_BIN" >/dev/null 2>&1; then
-    die "npm not found. Install Node.js, build locally and upload public_html/build, or run with --no-build."
+    die "npm not found. Remove --build to use the committed public_html/build assets."
 fi
 
 if [ "$DO_PULL" -eq 1 ] && [ -d "$ROOT/.git" ] && command -v git >/dev/null 2>&1; then
-    if [ "$ALLOW_DIRTY" -eq 0 ] && [ -n "$(git status --porcelain --untracked-files=no 2>/dev/null)" ]; then
+    if [ "$ALLOW_DIRTY" -eq 0 ] && [ -n "$(git status --porcelain --untracked-files=no -- . ':(exclude)public_html/build' 2>/dev/null)" ]; then
         die "Tracked files have uncommitted changes. Commit/stash them or use --allow-dirty."
     fi
 fi
@@ -293,6 +295,25 @@ if [ "$DO_PULL" -eq 1 ]; then
         if [ -n "$CURRENT_BRANCH" ] && [ "$CURRENT_BRANCH" != "$BRANCH" ]; then
             run git checkout "$BRANCH"
         fi
+
+        run git fetch origin "$BRANCH"
+
+        # Older deployments kept public_html/build untracked. Remove it when
+        # the incoming branch starts tracking the build so the pull can apply.
+        if [ -d "$ROOT/public_html/build" ] \
+            && ! git cat-file -e "HEAD:public_html/build/manifest.json" 2>/dev/null \
+            && git cat-file -e "origin/$BRANCH:public_html/build/manifest.json" 2>/dev/null; then
+            run rm -rf "$ROOT/public_html/build"
+            log "Removed the untracked build directory so the committed assets can be deployed."
+        fi
+
+        # Generated assets may differ after a server-side --build. Reset them
+        # so the pull can apply cleanly; they can be rebuilt afterwards.
+        if ! git diff --quiet -- public_html/build 2>/dev/null; then
+            run git checkout -- public_html/build
+            log "Reset generated frontend assets before pulling."
+        fi
+
         run git pull --ff-only origin "$BRANCH"
         log "Commit: $(git log -1 --format='%h %s' 2>/dev/null || echo unknown)"
     else
@@ -352,7 +373,11 @@ if [ "$DO_BUILD" -eq 1 ]; then
     fi
     run "$NPM_BIN" run build
 else
-    log "Frontend build skipped (--no-build). Ensure public_html/build is up to date."
+    log "Using committed frontend assets in public_html/build (pass --build to rebuild)."
+fi
+
+if [ ! -f "$ROOT/public_html/build/manifest.json" ]; then
+    die "public_html/build/manifest.json is missing. Run 'npm run build' locally and commit the result, or deploy with --build on a host with Node.js."
 fi
 
 section "Database migrations"
