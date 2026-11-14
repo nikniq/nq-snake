@@ -25,6 +25,7 @@ PHP_BIN="${PHP_BIN:-}"
 NPM_BIN="${NPM_BIN:-npm}"
 MAINTENANCE_ACTIVE=0
 START_TS=$SECONDS
+CURRENT_COMMAND=""
 
 usage() {
     cat <<'EOF'
@@ -108,6 +109,7 @@ die() {
 }
 
 run() {
+    CURRENT_COMMAND="$*"
     log "\$ $*"
     if [ "$DRY_RUN" -eq 1 ]; then
         return 0
@@ -209,7 +211,7 @@ on_error() {
     local line="$1"
     set +e
     log ""
-    log "Deployment failed at line $line."
+    log "Deployment failed at line $line${CURRENT_COMMAND:+ while running: $CURRENT_COMMAND}."
     disable_maintenance
     log "Fix the error above, then re-run ./deploy.sh."
     exit 1
@@ -365,13 +367,36 @@ else
 fi
 
 section "Frontend assets"
+BUILD_BACKUP=""
+
 if [ "$DO_BUILD" -eq 1 ]; then
     if [ -f "$ROOT/package-lock.json" ]; then
         run "$NPM_BIN" ci --no-audit --no-fund
     else
         run "$NPM_BIN" install --no-audit --no-fund
     fi
-    run "$NPM_BIN" run build
+
+    if [ -f "$ROOT/public_html/build/manifest.json" ]; then
+        BUILD_BACKUP=$(mktemp -d "${TMPDIR:-/tmp}/neon-build.XXXXXX") || BUILD_BACKUP=""
+        if [ -n "$BUILD_BACKUP" ]; then
+            cp -R "$ROOT/public_html/build/." "$BUILD_BACKUP/" 2>/dev/null || true
+        fi
+    fi
+
+    if run "$NPM_BIN" run build; then
+        log "Frontend assets rebuilt."
+    elif [ -n "$BUILD_BACKUP" ]; then
+        rm -rf "$ROOT/public_html/build"
+        mkdir -p "$ROOT/public_html/build"
+        cp -R "$BUILD_BACKUP/." "$ROOT/public_html/build/" 2>/dev/null || true
+        warn "Frontend build failed (Vite/Rolldown); restored the committed public_html/build assets and continuing."
+    else
+        die "Frontend build failed and no committed assets are available. Run 'npm run build' locally and commit public_html/build."
+    fi
+
+    if [ -n "$BUILD_BACKUP" ]; then
+        rm -rf "$BUILD_BACKUP"
+    fi
 else
     log "Using committed frontend assets in public_html/build (pass --build to rebuild)."
 fi

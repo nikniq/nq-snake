@@ -136,8 +136,11 @@ Deployment logs are written to `storage/logs/deploy-*.log`.
 
 Frontend assets are committed under `public_html/build/`, so Node.js is not
 required on the server. After changing `resources/css` or `resources/js`, run
-`npm run build` locally and commit the updated build. Use `./deploy.sh --build`
-to compile on the server instead.
+`npm run build` locally and commit the updated build.
+
+Prefer building locally. Vite 8's Rolldown bundler can panic on some shared
+hosting environments; if `--build` fails on the server, `deploy.sh` restores
+the committed assets and continues rather than leaving the deploy half-done.
 
 ### `./cx.sh`
 
