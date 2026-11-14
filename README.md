@@ -207,7 +207,19 @@ touch database/database.sqlite
 php artisan migrate --force
 ```
 
-If the app still reports that the database file does not exist, make sure the
-`database/` directory is writable by PHP. If you prefer not to use SQLite, set
-`DB_CONNECTION` and its credentials in `.env`, create the database, and run
-`php artisan migrate --force`.
+If `database/` is not writable by PHP, the app automatically uses
+`storage/database.sqlite` instead (copying an existing database when possible).
+If SQLite cannot be prepared at all, sessions and cache fall back to file
+drivers so pages still load instead of returning HTTP 500.
+
+If the site still reports that the database file does not exist:
+
+1. Confirm the latest commit is deployed: `git log -1 --oneline`.
+2. Run `./deploy.sh`, or manually:
+   `touch database/database.sqlite && php artisan migrate --force`.
+3. Make sure `database/` or `storage/` is writable by PHP.
+4. If changed PHP files are not taking effect, restart PHP-FPM/OPcache from the
+   hosting control panel.
+
+If you prefer not to use SQLite, set `DB_CONNECTION` and its credentials in
+`.env`, create the database, and run `php artisan migrate --force`.

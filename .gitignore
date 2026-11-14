@@ -25,6 +25,8 @@
 /storage/framework/database-init.lock
 /database/*.sqlite
 /database/*.sqlite-journal
+/storage/database.sqlite
+/storage/database.sqlite-journal
 /vendor
 _ide_helper.php
 Homestead.json
